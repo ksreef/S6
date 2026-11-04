@@ -1,20 +1,33 @@
 // Vite turns this import into a production-safe URL. Keep it as a file so
 // even this tiny example demonstrates a separately deployed asset.
 // @deno-types="./asset-url.d.ts"
-import tileUrl from "./assets/tile.svg?no-inline";
+import logoUrl from "./assets/discord-logo.svg?no-inline";
+import "./style.css";
 
 const app = document.querySelector<HTMLElement>("#app")!;
 
 const heading = document.createElement("h1");
-heading.textContent = "D1 project";
+heading.textContent = "Discord Pings Clicker";
 
-const image = document.createElement("img");
-image.src = tileUrl;
-image.alt = "A teal tile with a cream circle";
-image.width = 96;
-image.height = 96;
+const avatarButton = document.createElement("button");
+avatarButton.type = "button";
+avatarButton.className = "avatar-button";
+avatarButton.setAttribute("aria-label", "Discord avatar: click to get pinged");
 
-const message = document.createElement("p");
-message.textContent = "Your project starts here.";
+const avatarImage = document.createElement("img");
+avatarImage.src = logoUrl;
+avatarImage.alt = "";
+avatarImage.width = 224;
+avatarImage.height = 224;
+avatarImage.draggable = false;
+avatarButton.append(avatarImage);
 
-app.append(heading, image, message);
+const statusLine = document.createElement("p");
+statusLine.className = "status";
+statusLine.textContent = "Click the avatar to get pinged.";
+
+avatarButton.addEventListener("click", () => {
+  console.log("Ping! Click handler ran.");
+});
+
+app.append(heading, avatarButton, statusLine);

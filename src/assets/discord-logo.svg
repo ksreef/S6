@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img"
+  aria-label="Discord-style avatar">
+  <!-- Hand-drawn notification-buddy face in the Discord blurple style. -->
+  <defs>
+    <radialGradient id="highlight" cx="0.3" cy="0.22" r="0.9">
+      <stop offset="0" stop-color="#7983f5" />
+      <stop offset="0.55" stop-color="#5865f2" />
+      <stop offset="1" stop-color="#4a56e0" />
+    </radialGradient>
+  </defs>
+  <rect width="512" height="512" rx="120" fill="url(#highlight)" />
+  <path
+    fill="#ffffff"
+    d="M 256 120
+       C 180 120 122 136 100 150
+       C 82 162 74 182 78 204
+       C 86 254 102 318 138 356
+       C 162 380 190 388 208 376
+       C 224 364 240 346 256 346
+       C 272 346 288 364 304 376
+       C 322 388 350 380 374 356
+       C 410 318 426 254 434 204
+       C 438 182 430 162 412 150
+       C 390 136 332 120 256 120
+       Z" />
+  <ellipse cx="196" cy="240" rx="27" ry="36" fill="#5865f2" />
+  <ellipse cx="316" cy="240" rx="27" ry="36" fill="#5865f2" />
+</svg>
