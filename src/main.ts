@@ -2,6 +2,7 @@
 // even this tiny example demonstrates a separately deployed asset.
 // @deno-types="./asset-url.d.ts"
 import logoUrl from "./assets/discord-logo.svg?no-inline";
+import { PingSoundPlayer } from "./audio.ts";
 import "./style.css";
 
 const app = document.querySelector<HTMLElement>("#app")!;
@@ -37,9 +38,12 @@ function renderCounter(): void {
 
 renderCounter();
 
+const pingSound = new PingSoundPlayer();
+
 avatarButton.addEventListener("click", () => {
   pings += 1;
   renderCounter();
+  pingSound.play();
 });
 
 app.append(heading, counterLine, avatarButton, statusLine);
