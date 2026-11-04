@@ -4,7 +4,6 @@
 import "./style.css";
 
 import logoUrl from "./assets/discord-logo.svg?no-inline";
-// @deno-types="./asset-url.d.ts"
 import ghostUrl from "./assets/ghost.png";
 import { createAmbientBackground } from "./background.ts";
 import { CorruptionLayer } from "./corruption.ts";
@@ -206,7 +205,8 @@ UPGRADES.forEach((upgrade) => {
       if (upgrade.id === "holiday-ping") {
         updateHolidayTone(level + 1);
       }
-      corruption.setLevel(totalUpgradeLevels());
+      corruption.setAmbience(totalUpgradeLevels());
+      corruption.spawnCrack();
       render();
       statusLine.textContent = `Bought ${upgrade.name}! Level ${
         level + 1
@@ -322,7 +322,7 @@ function restartGame(): void {
   }
   updateHolidayTone(0);
   corruption.reset();
-  corruption.setLevel(0);
+  corruption.setAmbience(0);
   gameOverOverlay.hidden = true;
   statusLine.textContent = "Back to zero. The walls are clean... for now.";
   render();
@@ -386,4 +386,4 @@ function gameLoop(now: number): void {
 requestAnimationFrame(gameLoop);
 render();
 updateHolidayTone(0);
-corruption.setLevel(totalUpgradeLevels());
+corruption.setAmbience(totalUpgradeLevels());

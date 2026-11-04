@@ -4,9 +4,8 @@
 // screen the layer fires its doom callback. Presentation only; holds no
 // game state, so it can be driven from a single total-levels number.
 
-const MAX_CRACKS = 16;
+const MAX_CRACKS = 24;
 const MAX_SCRATCHES = 24;
-const CRACK_LEVELS_PER_CRACK = 2;
 const SCRATCH_LEVELS_PER_SCRATCH = 0.5;
 /** Width of the clickable band around every crack, in pixels. */
 const HIT_BAND_WIDTH = 48;
@@ -14,6 +13,8 @@ const HIT_BAND_WIDTH = 48;
 const REPAIR_RADIUS = 40;
 /** Fraction of the screen covered by cracks that triggers the doom. */
 const DOOM_COVERAGE = 0.5;
+/** Crack sizes scale with this reference screen area. */
+const REFERENCE_SCREEN_AREA = 1920 * 1080;
 
 interface Point {
   x: number;
@@ -40,6 +41,8 @@ export class CorruptionLayer {
   private scratchCount = 0;
   private coverage = 0;
   private doomFired = false;
+  /** Crack geometry scales with the viewport so every screen decays alike. */
+  private crackScale = 1;
 
   constructor(parent: HTMLElement) {
     this.svg = svgEl("svg", { class: "corruption-svg" });
@@ -65,27 +68,19 @@ export class CorruptionLayer {
     });
   }
 
-  /** Grow the decay with the total number of upgrade levels owned. */
-  setLevel(totalLevels: number): void {
-    const crackTarget = Math.min(
-      MAX_CRACKS,
-      Math.floor(totalLevels / CRACK_LEVELS_PER_CRACK),
-    );
+  /** Ambience intensity (vignette, tint, flicker) from total levels owned. */
+  setAmbience(totalLevels: number): void {
     const scratchTarget = Math.min(
       MAX_SCRATCHES,
       Math.floor(totalLevels / SCRATCH_LEVELS_PER_SCRATCH),
     );
 
-    // New damage fades in one after another, like the wall is still failing.
+    // New scratches fade in one after another, like the wall is still failing.
     let stagger = 0;
     while (this.scratchCount < scratchTarget) {
       this.addScratch(stagger);
       this.scratchCount += 1;
       stagger += 140;
-    }
-    while (this.cracks.length < crackTarget) {
-      this.addCrack(stagger);
-      stagger += 260;
     }
 
     this.vignette.style.opacity = `${
@@ -96,6 +91,14 @@ export class CorruptionLayer {
     }`;
     this.tint.style.opacity = `${Math.min(0.2, totalLevels * 0.018)}`;
     document.body.classList.toggle("corrupted", totalLevels >= 4);
+  }
+
+  /** Add exactly one new crack. Called once per upgrade purchase, so the
+   * damage meter climbs in steady, predictable steps. */
+  spawnCrack(): void {
+    if (this.cracks.length < MAX_CRACKS) {
+      this.addCrack(0);
+    }
   }
 
   /** Fraction of the screen currently covered by crack bands. */
@@ -139,11 +142,15 @@ export class CorruptionLayer {
   }
 
   private applyWindowSize(): void {
-    const width = globalThis.innerWidth;
-    const height = globalThis.innerHeight;
+    const width = Math.max(1, globalThis.innerWidth);
+    const height = Math.max(1, globalThis.innerHeight);
     this.svg.setAttribute("viewBox", `0 0 ${width} ${height}`);
     this.svg.setAttribute("width", `${width}`);
     this.svg.setAttribute("height", `${height}`);
+    // Scale crack length with the viewport, so the damage one crack adds
+    // stays roughly the same fraction of any screen size.
+    const scale = Math.sqrt((width * height) / REFERENCE_SCREEN_AREA);
+    this.crackScale = Math.max(0.7, Math.min(1.5, scale));
   }
 
   /** Re-scatter existing damage after a resize. */
@@ -212,7 +219,7 @@ export class CorruptionLayer {
     let branchPoints: Point[] = [];
 
     for (let i = 0; i < segments; i++) {
-      const step = 55 + Math.random() * 40;
+      const step = (55 + Math.random() * 40) * this.crackScale;
       angle += (Math.random() - 0.5) * 1.0;
       // Keep wobbling, but keep drifting back toward the middle.
       angle = angle * 0.65 + inward * 0.35;
@@ -227,7 +234,7 @@ export class CorruptionLayer {
         let ba = branchDirection;
         branchPoints = [{ x: bx, y: by }];
         for (let j = 0; j < 4; j++) {
-          const branchStep = 22 + Math.random() * 20;
+          const branchStep = (22 + Math.random() * 20) * this.crackScale;
           ba = ba * 0.7 + branchDirection * 0.3 + (Math.random() - 0.5) * 0.7;
           bx += Math.cos(ba) * branchStep;
           by += Math.sin(ba) * branchStep;

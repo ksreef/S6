@@ -1,6 +1,7 @@
 {
   "version": "5",
   "specifiers": {
+    "npm:typescript@5.9.3": "5.9.3",
     "npm:vite@8.3.1": "8.3.1"
   },
   "npm": {
@@ -228,6 +229,10 @@
         "fdir",
         "picomatch"
       ]
+    },
+    "typescript@5.9.3": {
+      "integrity": "sha512-jl1vZzPDinLr9eUt3J/t7V6FgNEw9QjvBPdysz9KfQDD41fQrC2Y4vKQdiaUpFT4bXlb1RHhLpp8wtm6M5TgSw==",
+      "bin": true
     },
     "vite@8.3.1": {
       "integrity": "sha512-/bvH9E9tmCXRGp2uXY3WbOldqpTwFkbha/8ANaEQ6VkxhH60KyqLwgZq6lG2y+4uT55x9+9eUHMpQ7uGnOCKjA==",
