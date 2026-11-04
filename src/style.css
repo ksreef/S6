@@ -211,6 +211,132 @@ h1 {
   animation-iteration-count: infinite;
 }
 
+.crack-hit {
+  cursor: pointer;
+}
+
+.damage {
+  font-variant-numeric: tabular-nums;
+}
+
+.damage.damage-warn {
+  color: #f0b132;
+}
+
+.damage.damage-critical {
+  color: #f23f43;
+}
+
+/* --- Game over ------------------------------------------------------------- */
+[hidden] {
+  display: none !important;
+}
+
+.game-over {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  text-align: center;
+  background:
+    radial-gradient(
+    circle at 50% 42%,
+    rgba(140, 10, 20, 0.55),
+    rgba(5, 0, 8, 0.97) 75%
+  );
+  animation: doom-flash 0.5s steps(3) both;
+}
+
+@keyframes doom-flash {
+  0% {
+    opacity: 0.2;
+  }
+  33% {
+    opacity: 1;
+  }
+  66% {
+    opacity: 0.55;
+  }
+  100% {
+    opacity: 1;
+  }
+}
+
+.game-over-ghost-wrap {
+  animation: ghost-shake 0.14s steps(2, end) infinite;
+}
+
+.game-over-ghost {
+  width: min(70vmin, 540px);
+  display: block;
+  filter: drop-shadow(0 0 34px rgba(140, 170, 255, 0.45));
+  animation: ghost-lunge 0.55s cubic-bezier(0.2, 1.4, 0.4, 1) both;
+}
+
+@keyframes ghost-lunge {
+  from {
+    transform: scale(0.15) rotate(-14deg);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1.08) rotate(2deg);
+    opacity: 1;
+  }
+}
+
+@keyframes ghost-shake {
+  0% {
+    transform: translate3d(-9px, 4px, 0) rotate(-1.2deg);
+  }
+  100% {
+    transform: translate3d(9px, -5px, 0) rotate(1.2deg);
+  }
+}
+
+.game-over h2 {
+  font-size: 2rem;
+  text-transform: none;
+  letter-spacing: 0.02em;
+  color: #f23f43;
+  text-shadow: 0 0 18px rgba(242, 63, 67, 0.5);
+  margin: 0;
+}
+
+.game-over p {
+  color: #dbdee1;
+  max-width: 26rem;
+  margin: 0;
+}
+
+.restart-button {
+  margin-top: 0.75rem;
+  padding: 0.7rem 2.2rem;
+  font-size: 1rem;
+  font-weight: 700;
+  color: #f2f3f5;
+  background: #5865f2;
+  border: 2px solid #f23f43;
+  border-radius: 10px;
+  cursor: pointer;
+  transition:
+    transform 120ms ease,
+    box-shadow 120ms ease;
+}
+
+.restart-button:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 0 22px rgba(88, 101, 242, 0.65);
+}
+
+.restart-button:focus-visible {
+  outline: 3px solid #f2f3f5;
+  outline-offset: 3px;
+}
+
 .scratch-flicker {
   animation-name: corruption-flicker;
   animation-timing-function: steps(1, end);
@@ -274,7 +400,10 @@ body.corrupted h1 {
   .mote,
   .crack-flicker,
   .scratch-flicker,
-  body.corrupted h1 {
+  body.corrupted h1,
+  .game-over,
+  .game-over-ghost-wrap,
+  .game-over-ghost {
     animation: none !important;
   }
 }

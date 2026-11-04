@@ -1,20 +1,45 @@
 // Creeping decay layer: hairline cracks and claw scratches appear on the
-// backdrop as more upgrades are bought. Presentation only; holds no game
-// state, so it can be driven from a single total-levels number.
+// backdrop as more upgrades are bought. Cracks can be clicked (within a
+// small radius) to seal them for pings, and if cracks ever cover half the
+// screen the layer fires its doom callback. Presentation only; holds no
+// game state, so it can be driven from a single total-levels number.
 
-const MAX_CRACKS = 12;
+const MAX_CRACKS = 16;
 const MAX_SCRATCHES = 24;
 const CRACK_LEVELS_PER_CRACK = 2;
 const SCRATCH_LEVELS_PER_SCRATCH = 0.5;
+/** Width of the clickable band around every crack, in pixels. */
+const HIT_BAND_WIDTH = 48;
+/** Clicks this close to a crack (or closer) can seal it. */
+const REPAIR_RADIUS = 40;
+/** Fraction of the screen covered by cracks that triggers the doom. */
+const DOOM_COVERAGE = 0.5;
+
+interface Point {
+  x: number;
+  y: number;
+}
+
+interface CrackData {
+  points: Point[];
+  group: SVGGElement;
+}
 
 export class CorruptionLayer {
+  /** Fired once when cracks cover half the screen. */
+  onDoom: (() => void) | null = null;
+  /** Fired with the click position whenever a crack band is clicked. */
+  onRepairRequest: ((point: Point) => void) | null = null;
+
   private svg: SVGSVGElement;
   private cracksGroup: SVGGElement;
   private scratchesGroup: SVGGElement;
   private vignette: HTMLDivElement;
   private tint: HTMLDivElement;
-  private crackCount = 0;
+  private cracks: CrackData[] = [];
   private scratchCount = 0;
+  private coverage = 0;
+  private doomFired = false;
 
   constructor(parent: HTMLElement) {
     this.svg = svgEl("svg", { class: "corruption-svg" });
@@ -32,6 +57,12 @@ export class CorruptionLayer {
     parent.append(this.svg, this.tint, this.vignette);
     this.applyWindowSize();
     addEventListener("resize", () => this.rebuild());
+    this.svg.addEventListener("click", (event) => {
+      if (!(event instanceof MouseEvent)) {
+        return;
+      }
+      this.onRepairRequest?.({ x: event.clientX, y: event.clientY });
+    });
   }
 
   /** Grow the decay with the total number of upgrade levels owned. */
@@ -52,9 +83,8 @@ export class CorruptionLayer {
       this.scratchCount += 1;
       stagger += 140;
     }
-    while (this.crackCount < crackTarget) {
+    while (this.cracks.length < crackTarget) {
       this.addCrack(stagger);
-      this.crackCount += 1;
       stagger += 260;
     }
 
@@ -68,6 +98,46 @@ export class CorruptionLayer {
     document.body.classList.toggle("corrupted", totalLevels >= 4);
   }
 
+  /** Fraction of the screen currently covered by crack bands. */
+  getCoverage(): number {
+    return this.coverage;
+  }
+
+  get crackCount(): number {
+    return this.cracks.length;
+  }
+
+  /** Seal the crack nearest to the point if it lies within the radius. */
+  repairNearestCrack(x: number, y: number): boolean {
+    let nearest: CrackData | null = null;
+    let nearestDistance = Infinity;
+    for (const crack of this.cracks) {
+      const distance = distanceToPolyline(crack.points, x, y);
+      if (distance < nearestDistance) {
+        nearest = crack;
+        nearestDistance = distance;
+      }
+    }
+    if (!nearest || nearestDistance > REPAIR_RADIUS) {
+      return false;
+    }
+    this.removeCrack(nearest);
+    return true;
+  }
+
+  /** Clear every trace of decay, e.g. when the game restarts. */
+  reset(): void {
+    this.cracks = [];
+    this.scratchCount = 0;
+    this.coverage = 0;
+    this.doomFired = false;
+    this.cracksGroup.replaceChildren();
+    this.scratchesGroup.replaceChildren();
+    this.vignette.style.opacity = "0.2";
+    this.tint.style.opacity = "0";
+    document.body.classList.remove("corrupted");
+  }
+
   private applyWindowSize(): void {
     const width = globalThis.innerWidth;
     const height = globalThis.innerHeight;
@@ -79,11 +149,11 @@ export class CorruptionLayer {
   /** Re-scatter existing damage after a resize. */
   private rebuild(): void {
     this.applyWindowSize();
-    const cracks = this.crackCount;
+    const cracks = this.cracks.length;
     const scratches = this.scratchCount;
     this.cracksGroup.replaceChildren();
     this.scratchesGroup.replaceChildren();
-    this.crackCount = 0;
+    this.cracks = [];
     this.scratchCount = 0;
     for (let i = 0; i < scratches; i++) {
       this.addScratch(0);
@@ -91,11 +161,24 @@ export class CorruptionLayer {
     for (let i = 0; i < cracks; i++) {
       this.addCrack(0);
     }
-    this.crackCount = cracks;
     this.scratchCount = scratches;
   }
 
-  /** A jagged hairline crack that draws itself inward from a screen edge. */
+  private removeCrack(crack: CrackData): void {
+    this.cracks = this.cracks.filter((candidate) => candidate !== crack);
+    crack.group.style.animation = "none";
+    const fade = crack.group.animate([{ opacity: 1 }, { opacity: 0 }], {
+      duration: 350,
+      easing: "ease-out",
+      fill: "forwards",
+    });
+    void fade.finished
+      .then(() => crack.group.remove())
+      .catch(() => crack.group.remove());
+    this.recomputeCoverage();
+  }
+
+  /** A long jagged crack that draws itself inward from a screen edge. */
   private addCrack(delayMs: number): void {
     const width = globalThis.innerWidth;
     const height = globalThis.innerHeight;
@@ -123,37 +206,37 @@ export class CorruptionLayer {
     angle += (Math.random() - 0.5) * 0.9;
     const inward = angle;
 
-    const segments = 7 + Math.floor(Math.random() * 5);
-    const branchAt = 2 + Math.floor(Math.random() * (segments - 3));
-    const points: string[] = [`${x.toFixed(1)},${y.toFixed(1)}`];
-    let branchPoints: string[] = [];
+    const segments = 14 + Math.floor(Math.random() * 11);
+    const branchAt = 4 + Math.floor(Math.random() * (segments - 7));
+    const points: Point[] = [{ x, y }];
+    let branchPoints: Point[] = [];
 
     for (let i = 0; i < segments; i++) {
-      const step = 18 + Math.random() * 30;
+      const step = 55 + Math.random() * 40;
       angle += (Math.random() - 0.5) * 1.0;
       // Keep wobbling, but keep drifting back toward the middle.
       angle = angle * 0.65 + inward * 0.35;
       x += Math.cos(angle) * step;
       y += Math.sin(angle) * step;
-      points.push(`${x.toFixed(1)},${y.toFixed(1)}`);
+      points.push({ x, y });
       if (i === branchAt) {
         const branchDirection = angle +
           (Math.random() < 0.5 ? -1 : 1) * (0.6 + Math.random() * 0.5);
         let bx = x;
         let by = y;
         let ba = branchDirection;
-        branchPoints = [`${bx.toFixed(1)},${by.toFixed(1)}`];
-        for (let j = 0; j < 3; j++) {
-          const branchStep = 10 + Math.random() * 16;
+        branchPoints = [{ x: bx, y: by }];
+        for (let j = 0; j < 4; j++) {
+          const branchStep = 22 + Math.random() * 20;
           ba = ba * 0.7 + branchDirection * 0.3 + (Math.random() - 0.5) * 0.7;
           bx += Math.cos(ba) * branchStep;
           by += Math.sin(ba) * branchStep;
-          branchPoints.push(`${bx.toFixed(1)},${by.toFixed(1)}`);
+          branchPoints.push({ x: bx, y: by });
         }
       }
     }
 
-    const d = `M ${points.join(" L ")}`;
+    const d = polylinePath(points);
     const group = svgEl("g", { class: "crack-flicker" });
     const shadow = svgEl("path", {
       d,
@@ -173,20 +256,21 @@ export class CorruptionLayer {
       "stroke-linejoin": "round",
       opacity: "0.62",
     });
+    const hit = svgEl("path", {
+      d,
+      fill: "none",
+      stroke: "transparent",
+      "stroke-width": `${HIT_BAND_WIDTH}`,
+      "stroke-linecap": "round",
+      "stroke-linejoin": "round",
+      "pointer-events": "stroke",
+      class: "crack-hit",
+    });
     group.append(shadow, main);
     this.cracksGroup.append(group);
-
-    shadow.animate([{ opacity: 0 }, { opacity: 0.4 }], {
-      duration: 600,
-      delay: delayMs,
-      easing: "ease-out",
-      fill: "forwards",
-    });
-    this.drawIn(main, delayMs);
-
     if (branchPoints.length > 1) {
       const branch = svgEl("path", {
-        d: `M ${branchPoints.join(" L ")}`,
+        d: polylinePath(branchPoints),
         fill: "none",
         stroke: "#e3e7ff",
         "stroke-width": "1",
@@ -196,7 +280,35 @@ export class CorruptionLayer {
       group.append(branch);
       this.drawIn(branch, delayMs + 120);
     }
+    group.append(hit);
+
+    shadow.animate([{ opacity: 0 }, { opacity: 0.4 }], {
+      duration: 600,
+      delay: delayMs,
+      easing: "ease-out",
+      fill: "forwards",
+    });
+    this.drawIn(main, delayMs);
     randomizeFlicker(group);
+    this.cracks.push({ points, group });
+    this.recomputeCoverage();
+  }
+
+  private recomputeCoverage(): void {
+    const width = Math.max(1, globalThis.innerWidth);
+    const height = Math.max(1, globalThis.innerHeight);
+    let totalLength = 0;
+    for (const crack of this.cracks) {
+      totalLength += polylineLength(crack.points);
+    }
+    this.coverage = Math.min(
+      1,
+      (totalLength * HIT_BAND_WIDTH) / (width * height),
+    );
+    if (!this.doomFired && this.coverage >= DOOM_COVERAGE) {
+      this.doomFired = true;
+      this.onDoom?.();
+    }
   }
 
   /** Thin scratches; two out of five are three-line claw marks. */
@@ -255,6 +367,40 @@ export class CorruptionLayer {
       },
     );
   }
+}
+
+function polylinePath(points: Point[]): string {
+  return `M ${
+    points.map((p) => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(" L ")
+  }`;
+}
+
+function polylineLength(points: Point[]): number {
+  let total = 0;
+  for (let i = 0; i < points.length - 1; i++) {
+    total += Math.hypot(
+      points[i + 1]!.x - points[i]!.x,
+      points[i + 1]!.y - points[i]!.y,
+    );
+  }
+  return total;
+}
+
+function distanceToPolyline(points: Point[], x: number, y: number): number {
+  let best = Infinity;
+  for (let i = 0; i < points.length - 1; i++) {
+    best = Math.min(best, distanceToSegment(points[i]!, points[i + 1]!, x, y));
+  }
+  return best;
+}
+
+function distanceToSegment(a: Point, b: Point, x: number, y: number): number {
+  const dx = b.x - a.x;
+  const dy = b.y - a.y;
+  const lengthSq = dx * dx + dy * dy;
+  let t = lengthSq === 0 ? 0 : ((x - a.x) * dx + (y - a.y) * dy) / lengthSq;
+  t = Math.max(0, Math.min(1, t));
+  return Math.hypot(x - (a.x + t * dx), y - (a.y + t * dy));
 }
 
 function randomizeFlicker(element: SVGElement): void {

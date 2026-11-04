@@ -4,6 +4,8 @@
 import "./style.css";
 
 import logoUrl from "./assets/discord-logo.svg?no-inline";
+// @deno-types="./asset-url.d.ts"
+import ghostUrl from "./assets/ghost.png";
 import { createAmbientBackground } from "./background.ts";
 import { CorruptionLayer } from "./corruption.ts";
 import { PingSoundPlayer, type SoundTheme } from "./audio.ts";
@@ -14,6 +16,7 @@ interface GameState {
   clickPower: number;
   passiveRate: number; // pings per second
   lastFrameTime: number;
+  lost: boolean; // true once the cracks take over the screen
 }
 
 interface UpgradeConfig {
@@ -34,6 +37,7 @@ const state: GameState = {
   clickPower: 1,
   passiveRate: 0,
   lastFrameTime: performance.now(),
+  lost: false,
 };
 
 // --- Data-Driven Upgrades -------------------------------------------------
@@ -126,6 +130,9 @@ rateLine.className = "status";
 const toneLine = document.createElement("p");
 toneLine.className = "status tone";
 
+const damageLine = document.createElement("p");
+damageLine.className = "status damage";
+
 const shopTitle = document.createElement("h2");
 shopTitle.textContent = "Upgrades";
 
@@ -142,6 +149,7 @@ app.append(
   avatarButton,
   toneLine,
   rateLine,
+  damageLine,
   shopTitle,
   shopList,
   statusLine,
@@ -151,6 +159,8 @@ app.append(
 // the game panel; the vignette and tint float above everything.
 createAmbientBackground(document.body, logoUrl);
 const corruption = new CorruptionLayer(document.body);
+corruption.onDoom = () => loseGame();
+corruption.onRepairRequest = (point) => attemptRepair(point);
 
 // --- Rendering -------------------------------------------------------------
 interface UpgradeUI {
@@ -184,6 +194,9 @@ UPGRADES.forEach((upgrade) => {
   upgradeUIs.set(upgrade.id, { root, title, desc, cost });
 
   root.addEventListener("click", () => {
+    if (state.lost) {
+      return;
+    }
     const level = upgradeLevels[upgrade.id];
     const cost = upgrade.getCost(level);
     if (state.pings >= cost) {
@@ -204,19 +217,32 @@ UPGRADES.forEach((upgrade) => {
   });
 });
 
+let lastDamageText = "";
+
 function render(): void {
   counterLine.textContent = `${Math.floor(state.pings)} pings`;
   rateLine.textContent = `+${
     state.passiveRate.toFixed(2)
   } pings/sec from your generators`;
+
+  const coverage = corruption.getCoverage();
+  const damageText =
+    `Screen damage: ${(coverage * 100).toFixed(0)}% — cracks take over at 50%` +
+    ` · seal one for ${crackSealCost()} pings`;
+  if (damageText !== lastDamageText) {
+    damageLine.textContent = damageText;
+    lastDamageText = damageText;
+  }
+  damageLine.classList.toggle("damage-warn", coverage >= 0.35);
+
   for (const upgrade of UPGRADES) {
     const ui = upgradeUIs.get(upgrade.id);
     if (!ui) continue;
     const level = upgradeLevels[upgrade.id];
     const cost = upgrade.getCost(level);
     ui.cost.textContent = `Cost: ${cost} pings (Lv. ${level})`;
-    ui.root.disabled = state.pings < cost;
-    ui.root.classList.toggle("affordable", state.pings >= cost);
+    ui.root.disabled = state.lost || state.pings < cost;
+    ui.root.classList.toggle("affordable", !state.lost && state.pings >= cost);
   }
 }
 
@@ -246,8 +272,100 @@ function updateHolidayTone(holidayLevel: number): void {
   toneLine.textContent = `Notification tone: ${TONE_LABELS[theme]}`;
 }
 
+// --- Game over --------------------------------------------------------------
+// If cracks ever cover half the screen, the ghost wins. Sealing a crack
+// costs pings and depends on how many cracks are already out there.
+const SEED_COST = 20;
+const SEED_COST_PER_CRACK = 10;
+
+function crackSealCost(): number {
+  return SEED_COST + SEED_COST_PER_CRACK * corruption.crackCount;
+}
+
+function attemptRepair(point: { x: number; y: number }): void {
+  if (state.lost) {
+    return;
+  }
+  const cost = crackSealCost();
+  if (state.pings < cost) {
+    statusLine.textContent =
+      `Not enough pings to seal a crack (${cost} needed).`;
+    return;
+  }
+  if (corruption.repairNearestCrack(point.x, point.y)) {
+    state.pings -= cost;
+    statusLine.textContent = `Crack sealed for ${cost} pings.`;
+    render();
+  } else {
+    statusLine.textContent = "No crack close enough to seal there.";
+  }
+}
+
+function loseGame(): void {
+  if (state.lost) {
+    return;
+  }
+  state.lost = true;
+  pingSound.playLossSting();
+  gameOverOverlay.hidden = false;
+  statusLine.textContent = "The cracks swallowed the screen.";
+  render();
+}
+
+function restartGame(): void {
+  state.pings = 0;
+  state.clickPower = 1;
+  state.passiveRate = 0;
+  state.lost = false;
+  for (const upgrade of UPGRADES) {
+    upgradeLevels[upgrade.id] = 0;
+  }
+  updateHolidayTone(0);
+  corruption.reset();
+  corruption.setLevel(0);
+  gameOverOverlay.hidden = true;
+  statusLine.textContent = "Back to zero. The walls are clean... for now.";
+  render();
+}
+
+const gameOverOverlay = document.createElement("div");
+gameOverOverlay.className = "game-over";
+gameOverOverlay.hidden = true;
+
+const gameOverGhost = document.createElement("div");
+gameOverGhost.className = "game-over-ghost-wrap";
+const ghostImage = document.createElement("img");
+ghostImage.src = ghostUrl;
+ghostImage.alt = "";
+ghostImage.className = "game-over-ghost";
+gameOverGhost.append(ghostImage);
+
+const gameOverTitle = document.createElement("h2");
+gameOverTitle.textContent = "The cracks won.";
+
+const gameOverText = document.createElement("p");
+gameOverText.textContent =
+  "You let half the screen fill with cracks. The pings claimed another one.";
+
+const restartButton = document.createElement("button");
+restartButton.type = "button";
+restartButton.className = "restart-button";
+restartButton.textContent = "Restart";
+restartButton.addEventListener("click", () => restartGame());
+
+gameOverOverlay.append(
+  gameOverGhost,
+  gameOverTitle,
+  gameOverText,
+  restartButton,
+);
+document.body.append(gameOverOverlay);
+
 // --- Click input -----------------------------------------------------------
 avatarButton.addEventListener("click", () => {
+  if (state.lost) {
+    return;
+  }
   state.pings += state.clickPower;
   pingSound.play();
   render();
@@ -258,7 +376,7 @@ function gameLoop(now: number): void {
   const elapsed = (now - state.lastFrameTime) / 1000;
   state.lastFrameTime = now;
 
-  if (state.passiveRate > 0) {
+  if (!state.lost && state.passiveRate > 0) {
     state.pings += state.passiveRate * elapsed;
     render();
   }

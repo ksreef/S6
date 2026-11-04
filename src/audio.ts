@@ -357,6 +357,23 @@ export class PingSoundPlayer {
     oscillator.stop(when + duration + 0.05);
   }
 
+  /** Harsh sting that plays with the game-over jumpscare. */
+  playLossSting(): void {
+    const context = this.ensureContext();
+    if (context.state === "suspended") {
+      void context.resume();
+    }
+    const now = context.currentTime;
+    this.playDrone(context, now, 45, 1.4, 0.3); // sub boom
+    for (const frequency of [220, 233.08, 311.13]) {
+      // Dissonant saw cluster: nothing about this chord resolves.
+      this.playWobbleNote(context, now, frequency, 1.3, 0.2, 0.5);
+    }
+    this.playSlide(context, now + 0.05, 640, 70, 1.1, 0.28, 0.5); // wail
+    this.playNoise(context, now, 0.7, 900, 0.3, 0.4); // crash
+    this.lastPlayedAt = now;
+  }
+
   private sendToEcho(source: AudioNode, amount: number): void {
     if (!this.echoSend || amount <= 0) {
       return;
