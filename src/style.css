@@ -18,12 +18,265 @@ body {
   text-align: center;
   max-width: 480px;
   width: 100%;
+  position: relative;
+  z-index: 2;
 }
 
 h1 {
   color: #f2f3f5;
   font-size: 1.6rem;
   margin: 0 0 1rem;
+}
+
+/* --- Ambient backdrop ------------------------------------------------------ */
+.bg {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.bg-gradient {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    130deg,
+    #14151a 0%,
+    #23244d 30%,
+    #3b3fae 55%,
+    #1a1c2e 80%,
+    #14151a 100%
+  );
+  background-size: 260% 260%;
+  animation: bg-shift 24s ease-in-out infinite alternate;
+}
+
+@keyframes bg-shift {
+  from {
+    background-position: 0% 0%;
+  }
+  to {
+    background-position: 100% 100%;
+  }
+}
+
+.bg-grid {
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(88, 101, 242, 0.14) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(88, 101, 242, 0.14) 1px, transparent 1px);
+  background-size: 46px 46px;
+  mask-image: radial-gradient(ellipse at 50% 45%, black, transparent 74%);
+  opacity: 0.35;
+  animation: grid-pan 26s linear infinite;
+}
+
+@keyframes grid-pan {
+  to {
+    background-position: 46px 92px;
+  }
+}
+
+.bg-emblem {
+  position: absolute;
+  width: 640px;
+  left: -6%;
+  top: 10%;
+  opacity: 0.05;
+  animation: emblem-drift 46s ease-in-out infinite alternate;
+}
+
+.bg-emblem-b {
+  width: 460px;
+  left: auto;
+  right: -8%;
+  top: auto;
+  bottom: -14%;
+  opacity: 0.04;
+  animation-duration: 64s;
+  animation-delay: -20s;
+}
+
+@keyframes emblem-drift {
+  from {
+    transform: translate3d(0, 0, 0) rotate(-6deg);
+  }
+  to {
+    transform: translate3d(4vw, -3vh, 0) rotate(7deg);
+  }
+}
+
+.bg-orb {
+  position: absolute;
+  width: 34vw;
+  height: 34vw;
+  border-radius: 50%;
+  filter: blur(70px);
+  opacity: 0.14;
+  animation-name: orb-float;
+  animation-timing-function: ease-in-out;
+  animation-iteration-count: infinite;
+  animation-direction: alternate;
+}
+
+@keyframes orb-float {
+  from {
+    transform: translate3d(-4vw, -3vh, 0) scale(1);
+  }
+  to {
+    transform: translate3d(5vw, 4vh, 0) scale(1.12);
+  }
+}
+
+.mote {
+  position: absolute;
+  bottom: -2vh;
+  border-radius: 50%;
+  background: #aab2ff;
+  opacity: 0.2;
+  animation-name: mote-drift;
+  animation-timing-function: linear;
+  animation-iteration-count: infinite;
+}
+
+.mote-blurple {
+  background: #5865f2;
+}
+
+@keyframes mote-drift {
+  0% {
+    transform: translate3d(0, 0, 0);
+    opacity: 0;
+  }
+  8% {
+    opacity: var(--mote-opacity, 0.2);
+  }
+  50% {
+    transform: translate3d(var(--mote-sway, 0px), -55vh, 0);
+  }
+  92% {
+    opacity: var(--mote-opacity, 0.2);
+  }
+  100% {
+    transform: translate3d(calc(var(--mote-sway, 0px) * -0.5), -118vh, 0);
+    opacity: 0;
+  }
+}
+
+/* --- Creeping corruption --------------------------------------------------- */
+.corruption-svg {
+  position: fixed;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+}
+
+.corruption-tint {
+  position: fixed;
+  inset: 0;
+  z-index: 3;
+  pointer-events: none;
+  opacity: 0;
+  background:
+    radial-gradient(
+    circle at 18% 12%,
+    rgba(120, 8, 24, 0.5),
+    transparent 42%
+  ),
+    radial-gradient(
+    circle at 84% 88%,
+    rgba(90, 6, 40, 0.45),
+    transparent 46%
+  );
+}
+
+.corruption-vignette {
+  position: fixed;
+  inset: 0;
+  z-index: 4;
+  pointer-events: none;
+  opacity: 0.2;
+  background: radial-gradient(
+    ellipse at 50% 46%,
+    transparent 42%,
+    rgba(4, 5, 12, 0.92) 100%
+  );
+}
+
+.crack-flicker {
+  animation-name: corruption-flicker;
+  animation-timing-function: steps(1, end);
+  animation-iteration-count: infinite;
+}
+
+.scratch-flicker {
+  animation-name: corruption-flicker;
+  animation-timing-function: steps(1, end);
+  animation-iteration-count: infinite;
+}
+
+@keyframes corruption-flicker {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  7% {
+    opacity: 0.4;
+  }
+  8% {
+    opacity: 1;
+  }
+  54% {
+    opacity: 0.75;
+  }
+  55.5% {
+    opacity: 1;
+  }
+  78% {
+    opacity: 0.55;
+  }
+  79% {
+    opacity: 1;
+  }
+}
+
+body.corrupted h1 {
+  animation: title-flicker 13s linear infinite;
+}
+
+@keyframes title-flicker {
+  0%,
+  91%,
+  94.5%,
+  100% {
+    opacity: 1;
+    text-shadow: 0 0 12px rgba(88, 101, 242, 0.35);
+  }
+  92% {
+    opacity: 0.55;
+  }
+  93% {
+    opacity: 1;
+  }
+  94% {
+    opacity: 0.7;
+    text-shadow: 0 0 2px rgba(226, 232, 255, 0.6);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bg-gradient,
+  .bg-grid,
+  .bg-emblem,
+  .bg-orb,
+  .mote,
+  .crack-flicker,
+  .scratch-flicker,
+  body.corrupted h1 {
+    animation: none !important;
+  }
 }
 
 h2 {

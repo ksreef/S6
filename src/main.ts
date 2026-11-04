@@ -4,6 +4,8 @@
 import "./style.css";
 
 import logoUrl from "./assets/discord-logo.svg?no-inline";
+import { createAmbientBackground } from "./background.ts";
+import { CorruptionLayer } from "./corruption.ts";
 import { PingSoundPlayer, type SoundTheme } from "./audio.ts";
 
 // --- Game State ------------------------------------------------------------
@@ -40,7 +42,9 @@ const UPGRADES: UpgradeConfig[] = [
   {
     id: "holiday-ping",
     name: "Holiday Ping Upgrade",
-    description: "More pings per click. Also changes your notification tone!",
+    description:
+      "More pings per click. Each level cycles your notification tone " +
+      "through five distinct moods.",
     baseCost: 25,
     costMultiplier: 2.2,
     effect: (s, level) => {
@@ -89,6 +93,11 @@ const UPGRADES: UpgradeConfig[] = [
 const upgradeLevels: Record<string, number> = {};
 UPGRADES.forEach((u) => (upgradeLevels[u.id] = 0));
 
+/** Sum of every owned level; drives how much the backdrop has decayed. */
+function totalUpgradeLevels(): number {
+  return Object.values(upgradeLevels).reduce((sum, level) => sum + level, 0);
+}
+
 // --- UI Layout -------------------------------------------------------------
 const app = document.querySelector<HTMLElement>("#app")!;
 
@@ -114,6 +123,9 @@ avatarButton.append(avatarImage);
 const rateLine = document.createElement("p");
 rateLine.className = "status";
 
+const toneLine = document.createElement("p");
+toneLine.className = "status tone";
+
 const shopTitle = document.createElement("h2");
 shopTitle.textContent = "Upgrades";
 
@@ -128,11 +140,17 @@ app.append(
   heading,
   counterLine,
   avatarButton,
+  toneLine,
   rateLine,
   shopTitle,
   shopList,
   statusLine,
 );
+
+// Ambient backdrop plus the creeping corruption overlay. Both sit behind
+// the game panel; the vignette and tint float above everything.
+createAmbientBackground(document.body, logoUrl);
+const corruption = new CorruptionLayer(document.body);
 
 // --- Rendering -------------------------------------------------------------
 interface UpgradeUI {
@@ -172,6 +190,10 @@ UPGRADES.forEach((upgrade) => {
       state.pings -= cost;
       upgradeLevels[upgrade.id] = level + 1;
       upgrade.effect(state, level + 1);
+      if (upgrade.id === "holiday-ping") {
+        updateHolidayTone(level + 1);
+      }
+      corruption.setLevel(totalUpgradeLevels());
       render();
       statusLine.textContent = `Bought ${upgrade.name}! Level ${
         level + 1
@@ -201,18 +223,27 @@ function render(): void {
 // --- Audio -----------------------------------------------------------------
 const pingSound = new PingSoundPlayer();
 
-// Holiday progression is tied to the "Holiday Ping Upgrade" level.
+// Every Holiday Ping Upgrade advances the tone; five distinct moods loop.
 const HOLIDAY_THEMES: SoundTheme[] = [
-  "default",
+  "classic",
   "halloween",
   "christmas",
-  "new-years",
+  "glitch",
+  "void",
 ];
 
+const TONE_LABELS: Record<SoundTheme, string> = {
+  classic: "Classic ding",
+  halloween: "Halloween howl",
+  christmas: "Christmas chimes",
+  glitch: "Glitch burst",
+  void: "Void whisper",
+};
+
 function updateHolidayTone(holidayLevel: number): void {
-  const theme =
-    HOLIDAY_THEMES[Math.min(holidayLevel, HOLIDAY_THEMES.length - 1)]!;
+  const theme = HOLIDAY_THEMES[holidayLevel % HOLIDAY_THEMES.length]!;
   pingSound.setTheme(theme);
+  toneLine.textContent = `Notification tone: ${TONE_LABELS[theme]}`;
 }
 
 // --- Click input -----------------------------------------------------------
@@ -237,3 +268,4 @@ function gameLoop(now: number): void {
 requestAnimationFrame(gameLoop);
 render();
 updateHolidayTone(0);
+corruption.setLevel(totalUpgradeLevels());
