@@ -26,8 +26,20 @@ const statusLine = document.createElement("p");
 statusLine.className = "status";
 statusLine.textContent = "Click the avatar to get pinged.";
 
+let pings = 0;
+
+const counterLine = document.createElement("p");
+counterLine.className = "counter";
+
+function renderCounter(): void {
+  counterLine.textContent = `${pings} pings`;
+}
+
+renderCounter();
+
 avatarButton.addEventListener("click", () => {
-  console.log("Ping! Click handler ran.");
+  pings += 1;
+  renderCounter();
 });
 
-app.append(heading, avatarButton, statusLine);
+app.append(heading, counterLine, avatarButton, statusLine);
